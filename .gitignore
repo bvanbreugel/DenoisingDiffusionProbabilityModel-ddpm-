@@ -1,10 +1,9 @@
-CheckpointsCondition*/*
-SampledImgs*
-SampledImgs/*
-saved_keras_models/*
-*.png
-*.th
-**blank.txt
+CheckpointsCondition*/**
+SampledImgs*/**
+saved_keras_models/**
+**/*.png
+**/*.th
+**/*.txt
 
 CIFAR100/*
 CIFAR10/*
