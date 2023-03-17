@@ -12,6 +12,8 @@ from torchvision import transforms
 from torchvision.datasets import CIFAR10, CIFAR100
 from torchvision.utils import save_image
 import os
+import glob
+
 
 from DiffusionFreeGuidence.DiffusionCondition import GaussianDiffusionSampler, GaussianDiffusionTrainer
 from DiffusionFreeGuidence.ModelCondition import UNet
@@ -141,8 +143,28 @@ def generate(modelConfig: Dict):
             model, modelConfig["beta_1"], modelConfig["beta_T"], modelConfig["T"], w=modelConfig["w"]).to(device)
         for label in range(modelConfig['num_classes']):
             num_batches = samples_per_class // modelConfig["batch_size_generation"]
-            start_index = 0
-            for batch in range(num_batches):
+            path = os.path.join(
+                            modelConfig["sampled_dir"], 'train', str(label))
+            os.makedirs(path, exist_ok=True)
+            current_files = glob.glob(path+'/*.png')
+            if len(current_files)<10:
+                start_index = 0
+            else:
+                start_index = int(sorted(current_files, key=os.path.getmtime)[-1].split('/')[-1][:-4])
+                if start_index >= np.floor(samples_per_class * p_train):
+                    path = os.path.join(
+                                modelConfig["sampled_dir"], 'test', str(label))
+                    os.makedirs(path, exist_ok=True)
+                    current_files = glob.glob(path+'/*.png')
+                    if len(current_files)>0:
+                        start_index = int(sorted(current_files, key=os.path.getmtime)[-1].split('/')[-1][:-4])
+            
+            print('Label', label, '\t Starting from index: ', start_index)
+            first_flag_test = True
+            batch_num = 0
+            
+            while start_index < samples_per_class-1 and batch_num < num_batches:
+                batch_num +=1
                 batch_size = min([modelConfig["batch_size_generation"], samples_per_class - start_index])
                 labels = (torch.ones(size=[batch_size]).long() * label+1).to(device)
                 # Sampled from standard normal distribution
@@ -152,15 +174,15 @@ def generate(modelConfig: Dict):
                 sampledImgs = sampledImgs * 0.5 + 0.5  # [0 ~ 1]
                 for j in range(batch_size):
                     if j +start_index < samples_per_class * p_train:
-                        path = os.path.join(
-                            modelConfig["sampled_dir"], 'train', str(label))
-                        os.makedirs(path, exist_ok=True)
+                        
                         save_image(sampledImgs[j], os.path.join(path, str(j+start_index) + ".png"))
                     else:
-                        path = os.path.join(
-                            modelConfig["sampled_dir"], 'test', str(label))
-                        os.makedirs(path, exist_ok=True)
+                        if first_flag_test:
+                            path = os.path.join(
+                                modelConfig["sampled_dir"], 'test', str(label))
+                            os.makedirs(path, exist_ok=True)
                         save_image(sampledImgs[j], os.path.join(
                            path, str(j+start_index) + ".png"))
-                        
+                        first_flag_test=False
+
                 start_index += batch_size

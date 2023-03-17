@@ -3,16 +3,16 @@ import os
 
 def main(model_config=None, **kwargs):
     modelConfig = {
-        "state": "traingen", # or eval
+        "state": "gen", # or eval
         "epoch": 40,
         "batch_size": 80,
         "batch_size_generation": 512,
-        "T": 100,
+        "T": 500,
         "channel": 128,
         "channel_mult": [1, 2, 2, 2],
         "num_res_blocks": 2,
         "dropout": 0.15,
-        "lr": 2e-4,
+        "lr": 1e-4,
         "multiplier": 2.5,
         "beta_1": 1e-4,
         "beta_T": 0.028,
@@ -20,9 +20,9 @@ def main(model_config=None, **kwargs):
         "grad_clip": 1.,
         "device": "cuda:0",
         "w": 1.8,
-        "save_dir": "./CheckpointsConditionV2",
+        "save_dir": "./CheckpointsCondition",
         "training_load_weight": None,
-        "sampled_dir": "./SampledImgsV2",
+        "sampled_dir": "./SampledImgs",
         "sampledNoisyImgName": "NoisyGuidenceImgs.png",
         "sampledImgName": "SampledGuidenceImgs.png",
         "nrow": 8,
@@ -36,15 +36,19 @@ def main(model_config=None, **kwargs):
     
     if model_config is not None:
         modelConfig = model_config
-        modelConfig["test_load_weight"] = f"ckpt_{modelConfig['epoch']-1}_.pt"
-        
+    
+    modelConfig["test_load_weight"] = f"ckpt_{modelConfig['epoch']-1}_.pt"
+                     
+    if modelConfig["T"] == 100:
+        modelConfig['sampled_dir']+= 'V2_'
+        modelConfig['save_dir']+= 'V2_'    
     
     if kwargs is not None:
         for key, value in kwargs.items():
             modelConfig[key] = value
     
     if modelConfig['seed'] == 'range':
-        seeds = range(5)
+        seeds = range(1,5)
     else:
         seeds = [modelConfig['seed']]
 
@@ -66,7 +70,7 @@ def main(model_config=None, **kwargs):
             train(modelConfig)
         elif modelConfig["state"] == "eval":
             eval(modelConfig)
-        elif modelConfig["state"] == "generate":
+        elif modelConfig["state"] == "gen":
             generate(modelConfig)
         elif modelConfig["state"] == "traingen":
             train(modelConfig)
