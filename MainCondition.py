@@ -61,8 +61,8 @@ def main(model_config=None, **kwargs):
             modelConfig['sampled_dir'] = sampled_dir+ str(modelConfig['seed']) + '/'
             modelConfig['num_classes'] = 10
         elif modelConfig['dataset'] == 'CIFAR100':
-            modelConfig['save_dir'] = modelConfig['save_dir'] + str(modelConfig['seed']) + 'CIFAR100/'
-            modelConfig['sampled_dir'] = modelConfig['sampled_dir'] + str(modelConfig['seed']) + 'CIFAR100/'
+            modelConfig['save_dir'] = save_dir + str(modelConfig['seed']) + 'CIFAR100/'
+            modelConfig['sampled_dir'] = sampled_dir + str(modelConfig['seed']) + 'CIFAR100/'
             modelConfig['num_classes'] = 100
 
         os.makedirs(modelConfig['save_dir'], exist_ok=True)
