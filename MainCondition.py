@@ -4,10 +4,10 @@ import os
 def main(model_config=None, **kwargs):
     modelConfig = {
         "state": "gen", # or eval
-        "epoch": 40,
+        "epoch": 70,
         "batch_size": 80,
-        "batch_size_generation": 512,
-        "T": 500,
+        "batch_size_generation": 128,
+        "T": 100,
         "channel": 128,
         "channel_mult": [1, 2, 2, 2],
         "num_res_blocks": 2,
@@ -48,15 +48,17 @@ def main(model_config=None, **kwargs):
             modelConfig[key] = value
     
     if modelConfig['seed'] == 'range':
-        seeds = range(1,5)
+        seeds = range(5,10)
     else:
         seeds = [modelConfig['seed']]
 
+    save_dir = modelConfig['save_dir']
+    sampled_dir = modelConfig['sampled_dir']
     for seed in seeds:
         modelConfig['seed'] = seed
         if modelConfig['dataset'] == 'CIFAR10':
-            modelConfig['save_dir'] = modelConfig['save_dir'] + str(modelConfig['seed']) + '/'
-            modelConfig['sampled_dir'] = modelConfig['sampled_dir'] + str(modelConfig['seed']) + '/'
+            modelConfig['save_dir'] = save_dir + str(modelConfig['seed']) + '/'
+            modelConfig['sampled_dir'] = sampled_dir+ str(modelConfig['seed']) + '/'
             modelConfig['num_classes'] = 10
         elif modelConfig['dataset'] == 'CIFAR100':
             modelConfig['save_dir'] = modelConfig['save_dir'] + str(modelConfig['seed']) + 'CIFAR100/'

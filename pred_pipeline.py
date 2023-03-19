@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score
 
-from pytorch_resnet_cifar10.trainer import main
+from pytorch_resnet_cifar10.trainer import main as resnet_main
 
 
 
@@ -12,7 +12,7 @@ def generate_images(K=5):
     for k in range(0,K):
         main(state = 'generate', seed=k)
 
-def train_downstream(K=5, include_ensemble=False):
+def train_downstream(K=5, include_naiveE=True, include_naiveC=True, off=5, train_dir_root='SampledImgsV2_'):
 
     # Training experiment
     # train resnet on training set per model
@@ -20,56 +20,75 @@ def train_downstream(K=5, include_ensemble=False):
     targets = []
     training_naiveS = []
 
-    for k in range(0, K):
-        main(state = 'train', seed=0, train_dir = str(k))
-        res = main(state = 'eval', seed=0, train_dir = str(k), val_dirs = ['real'])           
+    
+    for k in range(K):
+        resnet_main(seed=0, train_dir = str(k+off), train_dir_root=train_dir_root)
+        res = resnet_main(evaluate=True, seed=0, train_dir = str(k+off), val_dirs = ['real'], train_dir_root=train_dir_root)           
         
         preds.append(res['real']['preds'])
         targets.append(res['real']['targets'])
-        if targets[-1]!=targets[0]:
+        if np.any(targets[-1] != targets[0]):
             raise ValueError('targets not equal across runs, somewhere there is randomness')
         training_naiveS.append(accuracy_score(targets[k], np.argmax(preds[k],axis=1)))
     
     
-    if include_ensemble:
-        training_ensemble = []
+    if include_naiveE:
+        training_naiveE = []
         for k in range(0, K):
-            preds_ens = [preds[k]]
+            preds_naiveE = [preds[k]]
             for seed in range(1, K):
-                main(state = 'train', seed=k, train_dir = str(k), ensemble=True)
-                preds_ens.append(main(state = 'eval', seed=seed, train_dir = str(k), val_dirs = ['real'])['real']['preds'])
-            training_ensemble.append(accuracy_score(targets[0], np.argmax(np.mean(preds_ens,axis=0),axis=1)))
-        training_ensemble_mean = np.mean(training_ensemble)
-        training_ensemble_std = np.std(training_ensemble)
-            
+                resnet_main(seed=seed, train_dir = str(k+off), train_dir_root=train_dir_root)
+                preds_naiveE.append(resnet_main(evaluate = True, seed=seed, train_dir = str(k+off), val_dirs = ['real'],train_dir_root=train_dir_root)['real']['preds'])
+            training_naiveE.append(accuracy_score(targets[0], np.argmax(np.mean(preds_naiveE,axis=0),axis=1)))
+        training_naiveE_mean = np.mean(training_naiveE)
+        training_naiveE_std = np.std(training_naiveE)
+
+    if include_naiveC:
+        resnet_main(seed=0, train_dir = [str(i) for i in np.arange(K,dtype=int)+off], train_dir_root=train_dir_root)
+        res = resnet_main(evaluate=True, seed=0, train_dir = [str(i) for i in np.arange(K, dtype=int)+off], val_dirs = ['real'], train_dir_root=train_dir_root)
+        training_naiveC = accuracy_score(targets[0], np.argmax(res['real']['preds'],axis=1))
+
     training_dge = accuracy_score(targets[0], np.argmax(np.mean(preds,axis=0),axis=1))
+    training_naiveS = np.array(training_naiveS)
     training_naiveS_mean = np.mean(training_naiveS)
     training_naiveS_std = np.std(training_naiveS)
 
 
-    train_df = pd.DataFrame({'Naive (S)': f'{training_naiveS_mean}\pm{training_naiveS_std}', 
-                             'DGE_5':training_dge})
-    if include_ensemble:
-        train_df['Ensemble'] = f'{training_ensemble_mean}\pm{training_ensemble_std}'
+    train_df = pd.DataFrame({'Naive (S)': [f'{training_naiveS_mean}\pm{training_naiveS_std}'], 
+                             'DGE_5':[training_dge]})
+    if include_naiveE:
+        train_df['naiveE'] = [f'{training_naiveE_mean}\pm{training_naiveE_std}']
+    
+    if include_naiveC:
+        train_df['naiveC'] = [training_naiveC]
 
     print(train_df)
-
+    train_df.to_csv('train_results.csv')
+    
 
     # 
     results_matrix = np.zeros((K,K))
     for k in range(K):
-        res = main(state = 'eval', seed=0, train_dir = str(k), val_dirs = [str(i) for i in range(K)])         
+        res = resnet_main(evaluate = True, seed=0, train_dir = str(k+off), val_dirs = [str(i+off) for i in range(K)], train_dir_root=train_dir_root)         
         for l in range(K):
-            results_matrix[k,l] = accuracy_score(targets[l], np.argmax(res[l]['preds'],axis=1))
+            results_matrix[k,l] = accuracy_score(res[str(l+off)]['targets'], np.argmax(res[str(l+off)]['preds'],axis=1))
     
     print(results_matrix)
-    eval_naiveS_mean = np.mean(np.diag(results_matrix)-training_naiveS)
-    eval_naiveS_std = np.std(np.diag(results_matrix)-training_naiveS)
-    eval_dge = [np.mean([results_matrix[i] for i in range(K) if i!=k]) for k in range(K)]
-    eval_dge_mean = np.mean(eval_dge)
-    eval_dge_std = np.std(eval_dge)
+    print(training_naiveS)
+    eval_naiveS_mean = np.mean((np.diag(results_matrix)-training_naiveS)**2)
+    eval_naiveS_std = np.std((np.diag(results_matrix)-training_naiveS)**2)
+    eval_dge = np.array([np.mean([results_matrix[i] for i in range(K) if i!=k]) for k in range(K)])
+    eval_dge_mean = np.mean((eval_dge- training_naiveS)**2)
+    eval_dge_std = np.std((eval_dge - training_naiveS)**2)
 
+    eval_df = pd.DataFrame({'Naive': [f'{eval_naiveS_mean}\pm{eval_naiveS_std}'],
+                            'DGE_5':[f'{eval_dge_mean}\pm{eval_dge_std}']})
+    print(eval_df)
+
+    # save to disk
+    eval_df.to_csv('eval_results.csv')
+    return train_df, eval_df
         
 
 if __name__ == '__main__':
-    generate_images()
+    train_downstream(off=5)
