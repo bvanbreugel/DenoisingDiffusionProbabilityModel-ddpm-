@@ -10,7 +10,7 @@ from pytorch_resnet_cifar10.trainer import main as resnet_main
 def generate_images(K=5):
     # generate training and test images
     for k in range(0,K):
-        main(state = 'generate', seed=k)
+        main(state = 'gen', seed=k)
 
 def train_downstream(K=5, include_naiveE=True, include_naiveC=True, off=5, train_dir_root='SampledImgsV2_'):
 
@@ -45,17 +45,15 @@ def train_downstream(K=5, include_naiveE=True, include_naiveC=True, off=5, train
         training_naiveE_mean = np.mean(training_naiveE)
         training_naiveE_std = np.std(training_naiveE)
 
-    if include_naiveC:
-        resnet_main(seed=0, train_dir = [str(i) for i in np.arange(K,dtype=int)+off], train_dir_root=train_dir_root)
-        res = resnet_main(evaluate=True, seed=0, train_dir = [str(i) for i in np.arange(K, dtype=int)+off], val_dirs = ['real'], train_dir_root=train_dir_root)
-        training_naiveC = accuracy_score(targets[0], np.argmax(res['real']['preds'],axis=1))
-
     training_naiveS = np.array(training_naiveS)
     training_naiveS_mean = np.mean(training_naiveS)
     training_naiveS_std = np.std(training_naiveS)
 
     if include_naiveE:
-        training_dge = [accuracy_score(targets[0], np.argmax(np.mean([training_naiveE_preds[k][seed] for k in range(K)]))) for seed in range(K)]
+        training_dge = []
+        for seed in range(K):
+            pred_dge = np.mean([training_naiveE_preds[k][seed] for k in range(K)],axis=0)
+            training_dge.append(accuracy_score(targets[0], np.argmax(pred_dge, axis=1)))
         training_dge_mean = np.mean(training_dge)
         training_dge_std = np.std(training_dge)
         train_df = pd.DataFrame({'Naive (S)': [f'{training_naiveS_mean}\pm{training_naiveS_std}'],
@@ -69,8 +67,14 @@ def train_downstream(K=5, include_naiveE=True, include_naiveC=True, off=5, train
 
     
     if include_naiveC:
-        train_df['naiveC'] = [training_naiveC]
+        training_naiveC = []
+        for seed in range(K):
+            resnet_main(seed=seed, train_dir = [str(i) for i in np.arange(K,dtype=int)+off], train_dir_root=train_dir_root)
+            res = resnet_main(evaluate=True, seed=seed, train_dir = [str(i) for i in np.arange(K, dtype=int)+off], val_dirs = ['real'], train_dir_root=train_dir_root)
+            training_naiveC.append(accuracy_score(targets[0], np.argmax(res['real']['preds'],axis=1)))
 
+        train_df['naiveC'] = [f'{np.mean(training_naiveC)}\pm{np.std(training_naiveC)}']
+        
     print(train_df)
     train_df.to_csv('train_results.csv')
     
@@ -100,4 +104,5 @@ def train_downstream(K=5, include_naiveE=True, include_naiveC=True, off=5, train
         
 
 if __name__ == '__main__':
-    train_downstream(off=5)
+    generate_images(1)
+    #train_downstream(K=4, off=1, include_naiveE=True, include_naiveC=True, train_dir_root='SampledImgs')

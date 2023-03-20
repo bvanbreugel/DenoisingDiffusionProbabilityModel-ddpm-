@@ -79,13 +79,14 @@ class GaussianDiffusionSampler(nn.Module):
         xt_prev_mean = self.predict_xt_prev_mean_from_eps(x_t, t, eps=eps)
         return xt_prev_mean, var
 
-    def forward(self, x_T, labels):
+    def forward(self, x_T, labels, verbose=False):
         """
         Algorithm 2.
         """
         x_t = x_T
         for time_step in reversed(range(self.T)):
-            print(time_step)
+            if time_step % 10 == 0 and verbose:
+                print('Time step', time_step)
             t = x_t.new_ones([x_T.shape[0], ], dtype=torch.long) * time_step
             mean, var= self.p_mean_variance(x_t=x_t, t=t, labels=labels)
             if time_step > 0:

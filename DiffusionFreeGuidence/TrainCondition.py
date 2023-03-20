@@ -125,7 +125,16 @@ def eval(modelConfig: Dict):
         print(sampledImgs)
         save_image(sampledImgs, os.path.join(
             modelConfig["sampled_dir"],  modelConfig["sampledImgName"]), nrow=modelConfig["nrow"])
-        
+
+
+def find_start_index(path):
+    current_files = glob.glob(path+'/*.png')
+    if len(current_files) == 0:
+        return 0
+    else:
+        current_files = [int(file.split('/')[-1][:-4]) for file in current_files]
+        return max(current_files)+1
+
 def generate(modelConfig: Dict):
     samples_per_class = modelConfig["samples_per_class"] 
     p_train = modelConfig["p_train"]
@@ -141,29 +150,26 @@ def generate(modelConfig: Dict):
         model.eval()
         sampler = GaussianDiffusionSampler(
             model, modelConfig["beta_1"], modelConfig["beta_T"], modelConfig["T"], w=modelConfig["w"]).to(device)
+
         for label in range(modelConfig['num_classes']):
             num_batches = samples_per_class // modelConfig["batch_size_generation"]
             path = os.path.join(
                             modelConfig["sampled_dir"], 'train', str(label))
             os.makedirs(path, exist_ok=True)
-            current_files = glob.glob(path+'/*.png')
-            if len(current_files)<10:
-                start_index = 0
-            else:
-                start_index = int(sorted(current_files, key=os.path.getmtime)[-1].split('/')[-1][:-4])
-                if start_index >= np.floor(samples_per_class * p_train):
-                    path = os.path.join(
-                                modelConfig["sampled_dir"], 'test', str(label))
-                    os.makedirs(path, exist_ok=True)
-                    current_files = glob.glob(path+'/*.png')
-                    if len(current_files)>0:
-                        start_index = int(sorted(current_files, key=os.path.getmtime)[-1].split('/')[-1][:-4])
+            start_index = find_start_index(path)
+            
+            # to do: change such that multiple runs with different samples_per_class are possible (now it will not count the number of test points correctly)
+            if start_index >= np.floor(samples_per_class * p_train):
+                path = os.path.join(
+                            modelConfig["sampled_dir"], 'test', str(label))
+                os.makedirs(path, exist_ok=True)
+                start_index = find_start_index(path)
             
             print('Label', label, '\t Starting from index: ', start_index)
             first_flag_test = True
             batch_num = 0
             
-            while start_index < samples_per_class-1 and batch_num < num_batches:
+            while start_index < samples_per_class and batch_num < num_batches:
                 batch_num +=1
                 batch_size = min([modelConfig["batch_size_generation"], samples_per_class - start_index])
                 labels = (torch.ones(size=[batch_size]).long() * label+1).to(device)
@@ -185,4 +191,6 @@ def generate(modelConfig: Dict):
                            path, str(j+start_index) + ".png"))
                         first_flag_test=False
 
+                    print('Saved file', os.path.join(path, str(j+start_index) + ".png"))
+                          
                 start_index += batch_size

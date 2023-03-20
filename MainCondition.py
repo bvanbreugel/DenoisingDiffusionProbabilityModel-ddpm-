@@ -4,10 +4,10 @@ import os
 def main(model_config=None, **kwargs):
     modelConfig = {
         "state": "gen", # or eval
-        "epoch": 70,
+        "epoch": 40,
         "batch_size": 80,
         "batch_size_generation": 128,
-        "T": 100,
+        "T": 500,
         "channel": 128,
         "channel_mult": [1, 2, 2, 2],
         "num_res_blocks": 2,
@@ -80,4 +80,4 @@ def main(model_config=None, **kwargs):
 
 
 if __name__ == '__main__':
-    main()
+    main(state = 'traingen', seed=7)
